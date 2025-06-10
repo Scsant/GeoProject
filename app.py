@@ -31,7 +31,7 @@ st.dataframe(df, use_container_width=True, hide_index=True)
 # Download Excel
 excel_file = to_excel(df)
 st.download_button(
-    label='📎 Baixar Excel',
+    label='Baixar Excel',
     data=excel_file,
     file_name='talhoes_baldeio.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
