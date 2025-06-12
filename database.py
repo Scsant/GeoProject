@@ -3,7 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # carrega o .env
+load_dotenv()
 
 def get_connection():
     user = os.getenv('DB_USER')
@@ -12,12 +12,14 @@ def get_connection():
     port = os.getenv('DB_PORT')
     dbname = os.getenv('DB_NAME')
 
-    engine = create_engine(f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}')
-    return engine.connect()
+    return create_engine(
+        f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}',
+        connect_args={'client_encoding': 'utf8'}
+    )
 
 
 def carregar_dados(conn):
-    query = text("""
+    query = """
     SELECT 
         vcctc.dcr_regiao,
         vcctc.id_projeto,
@@ -37,7 +39,12 @@ def carregar_dados(conn):
         WHERE vw_uso_solo_sde.nom_projeto = vcctc.nom_projeto
         LIMIT 1
     ) vuss ON TRUE
-    WHERE vcctc.dcr_operacao IN ('BALDEIO FORWARDER', 'CORTE HARVESTER')
+    WHERE vcctc.dcr_operacao = 'BALDEIO FORWARDER'
       AND vcctc.flag_cto_executado = 'S'
-    """)
-    return pd.read_sql_query(query, conn)
+    """
+
+    result = conn.execute(text(query))
+    rows = result.fetchall()
+    columns = result.keys()
+
+    return pd.DataFrame(rows, columns=columns)
