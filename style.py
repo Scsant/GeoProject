@@ -13,7 +13,7 @@ def set_style():
                 color: #ffffff !important;
             }
             .stApp {
-                background: linear-gradient(120deg, #484873, #e2ebf2);
+                background: linear-gradient(180deg, #162C33, #5295AB);
                 font-family: 'Helvetica Neue', sans-serif;
             }
             .stDownloadButton > button {
