@@ -1,41 +1,43 @@
 import streamlit as st
-from database import get_connection, carregar_dados
+import pandas as pd
 from filters import apply_filters
 from exporter import to_excel
 from style import set_style
 from painel import mostrar_painel
 
-# Configurações iniciais
+# Aplicar estilo
 set_style()
 
-# Conexão com o banco
-engine = get_connection()
+# Carregar dados do CSV
+@st.cache_data
 
-# Carregar dados com conexão ativa
-with engine.connect() as conn:
-    with st.spinner('Carregando dados...'):
-        df = carregar_dados(conn)
+def carregar_dados_csv():
+    return pd.read_csv("dados.csv", parse_dates=["data_cto", "data_inicio_operacao"])
 
-# Aplicar filtros
-# Carregar e filtrar
-df = apply_filters(df)
+# Carregar dados
+with st.spinner('Carregando dados...'):
+    df = carregar_dados_csv()
 
-if df.empty:
-    st.warning("Nenhum dado encontrado com os filtros aplicados.")
-    st.stop()
+    # Aplicar filtros
+    # Carregar e filtrar
+    df = apply_filters(df)
 
-# ✅ Mostrar novo painel
-mostrar_painel(df)
+    if df.empty:
+        st.warning("Nenhum dado encontrado com os filtros aplicados.")
+        st.stop()
 
-# ✅ Exibir dados e exportar
-st.dataframe(df, use_container_width=True, hide_index=True)
+    # ✅ Mostrar novo painel
+    mostrar_painel(df)
 
-excel_file = to_excel(df)
-st.download_button(
-    label=' Baixar Excel',
-    data=excel_file,
-    file_name='baldeio_ativos.xlsx',
-    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-)
+    # ✅ Exibir dados e exportar
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    excel_file = to_excel(df)
+    st.download_button(
+        label=' Baixar Excel',
+        data=excel_file,
+        file_name='baldeio_ativos.xlsx',
+        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 
