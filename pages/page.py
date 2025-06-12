@@ -65,7 +65,7 @@ with col4:
 
 st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
 
-with st.expander("📂 Mostrar Talhões com CTO (Histórico das Fazendas Executadas)"):
+with st.expander("📂 Fazendas com CTO e que apareceram com data de inicio de Baldeio!"):
     fazendas_executadas = df_filtrado[df_filtrado['fazenda_ja_executada']]['nom_projeto'].unique().tolist()
     if fazendas_executadas:
         cto_df = historico[
