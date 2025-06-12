@@ -1,60 +1,31 @@
+from pathlib import Path
 import streamlit as st
 import pandas as pd
-from database import get_connection
-from sqlalchemy import text
 from exporter import to_excel
 from datetime import date
 from style import set_style
 
-# Configurações iniciais
 set_style()
 
+@st.cache_data
+def carregar_dados():
+    return pd.read_csv("dados.csv", parse_dates=["data_inicio_operacao", "data_cto"])
 
-engine = get_connection()
+df = carregar_dados()
 
-with engine.connect() as conn:
-    with st.spinner("🔄 Carregando dados..."):
-        query = text("""
-            SELECT 
-                vcctc.dcr_regiao,
-                vcctc.id_projeto,
-                vcctc.nom_projeto,
-                vcctc.cd_talhao,
-                vcctc.data_cto,
-                vcctc.dcr_operacao,
-                vcctc.flag_cto_executado,
-                vcctc.data_inicio_operacao,
-                vuss.dcr_municipio,
-                vuss.dcr_estado,
-                vuss.vlr_area
-            FROM iforestry.vw_cubo_col_talhoes_cto vcctc
-            LEFT JOIN LATERAL (
-                SELECT dcr_municipio, dcr_estado, vlr_area
-                FROM iforestry.vw_uso_solo_sde
-                WHERE nom_projeto = vcctc.nom_projeto
-                LIMIT 1
-            ) vuss ON TRUE
-            WHERE vcctc.dcr_operacao = 'BALDEIO FORWARDER'
-              AND vcctc.data_inicio_operacao IS NOT NULL
-              AND vcctc.data_cto IS NULL
-              AND vcctc.flag_cto_executado = 'N'
-        """)
-        df = pd.DataFrame(conn.execute(query).fetchall(), columns=[
-            'dcr_regiao', 'id_projeto', 'nom_projeto', 'cd_talhao', 'data_cto',
-            'dcr_operacao', 'flag_cto_executado', 'data_inicio_operacao',
-            'dcr_municipio', 'dcr_estado', 'vlr_area'
-        ])
 
-        hist_query = text("""
-            SELECT DISTINCT nom_projeto
-            FROM iforestry.vw_cubo_col_talhoes_cto
-            WHERE dcr_operacao = 'BALDEIO FORWARDER'
-              AND flag_cto_executado = 'S'
-        """)
-        historico = pd.DataFrame(conn.execute(hist_query).fetchall(), columns=['nom_projeto'])
+# Filtro exatamente como na versão com banco
+df = df[
+    (df['dcr_operacao'] == 'BALDEIO FORWARDER') &
+    (df['data_inicio_operacao'].notnull()) &
+    (df['data_cto'].isnull()) &
+    (df['flag_cto_executado'] == 'N')
+]
 
-df['data_inicio_operacao'] = pd.to_datetime(df['data_inicio_operacao'], errors='coerce')
-df['fazenda_ja_executada'] = df['nom_projeto'].isin(historico['nom_projeto'])
+# Marcar se a fazenda já teve baldeio executado com CTO
+historico = pd.read_csv("dados.csv")  # Usa o mesmo arquivo completo
+executadas = historico[historico['flag_cto_executado'] == 'S']['nom_projeto'].unique()
+df['fazenda_ja_executada'] = df['nom_projeto'].isin(executadas)
 
 st.sidebar.header("🔎 Filtros")
 regioes = st.sidebar.multiselect("Região", df['dcr_regiao'].unique())
@@ -97,23 +68,12 @@ st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
 with st.expander("📂 Mostrar Talhões com CTO (Histórico das Fazendas Executadas)"):
     fazendas_executadas = df_filtrado[df_filtrado['fazenda_ja_executada']]['nom_projeto'].unique().tolist()
     if fazendas_executadas:
-        query_cto = text(f'''
-            SELECT 
-                nom_projeto,
-                cd_talhao,
-                data_cto
-            FROM iforestry.vw_cubo_col_talhoes_cto
-            WHERE dcr_operacao = 'BALDEIO FORWARDER'
-              AND flag_cto_executado = 'S'
-              AND nom_projeto IN ({','.join([f"'{f}'" for f in fazendas_executadas])})
-        ''')
-        with engine.connect() as conn:
-            cto_df = pd.DataFrame(conn.execute(query_cto).fetchall(), columns=[
-                'nom_projeto', 'cd_talhao', 'data_cto'
-            ])
+        cto_df = historico[
+            (historico['flag_cto_executado'] == 'S') &
+            (historico['nom_projeto'].isin(fazendas_executadas)) &
+            (historico['data_cto'].notnull())
+        ][['nom_projeto', 'cd_talhao', 'data_cto']]
         st.dataframe(cto_df, use_container_width=True, hide_index=True)
-        # Inserir botão de download do histórico de CTO dentro do expander
-
         if not cto_df.empty:
             excel_cto = to_excel(cto_df)
             st.download_button(
