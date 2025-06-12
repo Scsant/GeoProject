@@ -5,6 +5,13 @@ from datetime import date
 
 def apply_filters(df):
     df_filtered = df.copy()
+        # Filtro: apenas baldeios já executados
+    df_filtered = df_filtered[
+        (df_filtered['dcr_operacao'] == 'BALDEIO FORWARDER') &
+        (df_filtered['flag_cto_executado'] == 'S')
+    ]
+
+    
     df_filtered['data_cto'] = pd.to_datetime(df_filtered['data_cto'], errors='coerce')
     df_filtered = df_filtered.dropna(subset=['data_cto'])
 
